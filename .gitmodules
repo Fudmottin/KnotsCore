@@ -1,0 +1,6 @@
+[submodule "src/bitcoinknots"]
+	path = src/bitcoinknots
+	url = https://github.com/bitcoinknots/bitcoin
+[submodule "src/bitcoin"]
+	path = src/bitcoin
+	url = https://github.com/bitcoin/bitcoin
