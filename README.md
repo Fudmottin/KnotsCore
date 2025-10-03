@@ -17,7 +17,8 @@ Focus on functional changes between the two repositories using Git tags, ignorin
 - CMake
 
 # Build KnotsCore
-```mkdir build && cd build
+```
+mkdir build && cd build
 cmake ..
 make
 ```
