@@ -18,7 +18,21 @@ int main(int argc, char* argv[]) {
         git::init();
         auto files = git::listChangedFiles(coreRepo, coreTag, knotsRepo, knotsTag);
         std::cout << "Number of changed files: " << files.size() << "\n";
-        diff::printFileDiffs(files, coreRepo, coreTag, knotsRepo, knotsTag);
+
+        for (const auto& f : files) {
+            std::cout << "  " << f.path << " -> ";
+            switch (f.status) {
+                case git::FileDiff::Status::OnlyInCore:  std::cout << "Only in Core"; break;
+                case git::FileDiff::Status::OnlyInKnots: std::cout << "Only in Knots"; break;
+                case git::FileDiff::Status::Modified:    std::cout << "Modified"; break;
+            }
+            std::cout << "\n";
+
+            if (!f.patch.empty()) {
+                diff::printPatch(f.path, f.patch);
+            }
+        }
+
         git::shutdown();
     } catch (const std::exception& ex) {
         std::cerr << "Error: " << ex.what() << "\n";
