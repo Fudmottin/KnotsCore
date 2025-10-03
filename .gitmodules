@@ -1,6 +1,10 @@
 [submodule "src/bitcoinknots"]
-	path = src/bitcoinknots
-	url = https://github.com/bitcoinknots/bitcoin
+    path = src/bitcoinknots
+    url = https://github.com/bitcoinknots/bitcoin
+    ignore = dirty
+
 [submodule "src/bitcoin"]
-	path = src/bitcoin
-	url = https://github.com/bitcoin/bitcoin
+    path = src/bitcoin
+    url = https://github.com/bitcoin/bitcoin
+    ignore = dirty
+

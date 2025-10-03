@@ -1,11 +1,20 @@
-add_executable(KnotesCore knotscore/main.cpp)
-target_include_directories(KnotesCore PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/knotescore)
-# No external deps required; rely on system git
-if(UNIX)
-  find_program(GIT_EXECUTABLE git REQUIRED)
-  if(NOT GIT_EXECUTABLE)
-    message(FATAL_ERROR "git not found")
-  endif()
-  target_compile_definitions(KnotesCore PRIVATE GIT_EXECUTABLE="${GIT_EXECUTABLE}")
-endif()
+set(SOURCES
+    knotscore/main.cpp
+    knotscore/GitUtils.cpp
+    knotscore/DiffPrinter.cpp
+    knotscore/FileWalker.cpp
+)
+
+add_executable(KnotesCore ${SOURCES})
+
+target_include_directories(KnotesCore PRIVATE knotscore)
+target_link_libraries(KnotesCore PRIVATE ${LIBGIT2_LIBRARIES})
+
+# Optional: make a custom target to update submodules at build time
+find_package(Git REQUIRED)
+add_custom_target(update_submodules
+    COMMAND ${GIT_EXECUTABLE} submodule update --init --recursive --remote
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    COMMENT "Updating git submodules (Core and Knots)"
+)
 
