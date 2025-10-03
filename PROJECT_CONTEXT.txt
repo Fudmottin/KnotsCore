@@ -1,0 +1,23 @@
+Project Context and Goals
+-------------------------
+
+Project: Comparing Bitcoin Core and Bitcoin Knots repositories.
+
+Objective:
+- Analyze code differences between Bitcoin Core and Bitcoin Knots based on Git tags.
+- Focus on meaningful changes, ignoring purely cosmetic differences (formatting, whitespace, line endings, etc.).
+- Understand which changes affect functionality, rather than merely file hashes.
+
+Environment:
+- Language: C++20
+- Tools: Git, libgit2
+- Platform: macOS and Raspberry Pi Linux
+
+Notes:
+- Modified files may show as different due to hashing differences even if textual content is identical.
+- Goal is to filter out these non-functional changes and isolate true code modifications.
+- Future work includes automating the comparison using libgit2 and handling tag-based diffs effectively.
+
+Reminder:
+- When resuming, start by recalling the focus on meaningful differences and ignoring cosmetic modifications.
+
