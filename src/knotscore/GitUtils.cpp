@@ -55,53 +55,55 @@ std::map<std::string, const git_tree_entry*> collectTreeEntries(git_tree* tree) 
     return entries;
 }
 
+// Recursive lookup of a tree entry by path
+const git_tree_entry* findEntryByPath(git_repository* repo, git_tree* tree, const std::string& path) {
+    size_t pos = path.find('/');
+    if (pos == std::string::npos) {
+        return git_tree_entry_byname(tree, path.c_str());
+    } else {
+        std::string head = path.substr(0, pos);
+        std::string tail = path.substr(pos + 1);
+        const git_tree_entry* entry = git_tree_entry_byname(tree, head.c_str());
+        if (!entry || git_tree_entry_type(entry) != GIT_OBJ_TREE) return nullptr;
+
+        git_tree* subTree;
+        if (git_tree_lookup(&subTree, repo, git_tree_entry_id(entry)) < 0) return nullptr;
+        const git_tree_entry* result = findEntryByPath(repo, subTree, tail);
+        git_tree_free(subTree);
+        return result;
+    }
+}
+
 // ------------------- diff -------------------
 
-// diff a single file given tree objects
-std::string diffFile(
-    git_repository* coreRepo,
-    git_tree* coreTree,
-    git_repository* knotsRepo,
-    git_tree* knotsTree,
-    const std::string& path)
+// diff a single file by path
+std::string diffSingleFile(git_repository* coreRepo, git_tree* coreTree,
+                           git_repository* knotsRepo, git_tree* knotsTree,
+                           const std::string& path)
 {
     git_diff* diff = nullptr;
-    if (git_diff_tree_to_tree(&diff, coreRepo, coreTree, knotsTree, nullptr) < 0)
-        throw std::runtime_error("Failed to compute diff");
+    git_diff_options opts = GIT_DIFF_OPTIONS_INIT;
 
-    struct PatchCollector {
-        std::string targetFile;
-        std::ostringstream patchText;
+    // pathspec
+    const char* paths[] = { path.c_str() };
+    opts.pathspec.strings = const_cast<char**>(paths);
+    opts.pathspec.count   = 1;
 
-        static int file_cb(const git_diff_delta*, float, void*) { return 0; }
-        static int binary_cb(const git_diff_delta*, const git_diff_binary*, void*) { return 0; }
-        static int hunk_cb(const git_diff_delta*, const git_diff_hunk*, void*) { return 0; }
+    if (git_diff_tree_to_tree(&diff, coreRepo, coreTree, knotsTree, &opts) < 0)
+        return "";
 
-        static int line_cb(const git_diff_delta* delta,
-                           const git_diff_hunk*,
-                           const git_diff_line* line,
-                           void* payload)
-        {
-            auto* self = static_cast<PatchCollector*>(payload);
-            if (self->targetFile == delta->new_file.path) {
-                self->patchText.write(line->content, line->content_len);
-            }
+    struct Collector {
+        std::ostringstream out;
+        static int line_cb(const git_diff_delta*, const git_diff_hunk*, const git_diff_line* line, void* payload) {
+            auto* self = static_cast<Collector*>(payload);
+            self->out.write(line->content, line->content_len);
             return 0;
         }
-    };
+    } collector;
 
-    PatchCollector collector;
-    collector.targetFile = path;
-
-    git_diff_foreach(diff,
-                     &PatchCollector::file_cb,
-                     &PatchCollector::binary_cb,
-                     &PatchCollector::hunk_cb,
-                     &PatchCollector::line_cb,
-                     &collector);
-
+    git_diff_foreach(diff, nullptr, nullptr, nullptr, &Collector::line_cb, &collector);
     git_diff_free(diff);
-    return collector.patchText.str();
+    return collector.out.str();
 }
 
 // recursive tree diff
@@ -138,8 +140,7 @@ void collectDiffsRecursive(
             } else if (coreType == GIT_OBJ_BLOB &&
                        git_oid_cmp(git_tree_entry_id(coreEntry), git_tree_entry_id(knotsEntry)) != 0)
             {
-                std::string patch = diffFile(coreRepo, coreTree, knotsRepo, knotsTree, fullPath);
-                diffs.push_back({fullPath, FileDiff::Status::Modified, patch});
+                diffs.push_back({fullPath, FileDiff::Status::Modified, ""}); // patch will be filled later
             } else if (coreType == GIT_OBJ_TREE) {
                 git_tree* subCoreTree;
                 git_tree* subKnotsTree;
@@ -153,7 +154,7 @@ void collectDiffsRecursive(
     }
 }
 
-// listChangedFiles entry
+// listChangedFiles entry (two-pass: collect files, then fill patches)
 std::vector<FileDiff> listChangedFiles(
     const std::string& coreRepoPath,
     const std::string& coreTag,
@@ -172,8 +173,16 @@ std::vector<FileDiff> listChangedFiles(
         git_commit_tree(&knotsTree, knotsCommit) < 0)
         throw std::runtime_error("Failed to get tree for commit");
 
+    // Pass 1: collect files
     std::vector<FileDiff> diffs;
     collectDiffsRecursive(coreRepo, knotsRepo, coreTree, knotsTree, "", diffs);
+
+    // Pass 2: compute patches only for modified files
+    for (auto& fd : diffs) {
+        if (fd.status == FileDiff::Status::Modified) {
+            fd.patch = diffSingleFile(coreRepo, coreTree, knotsRepo, knotsTree, fd.path);
+        }
+    }
 
     git_tree_free(coreTree);
     git_tree_free(knotsTree);

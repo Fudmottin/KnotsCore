@@ -1,44 +1,41 @@
 #include "GitUtils.hpp"
-#include "DiffPrinter.hpp"
 #include <iostream>
+#include <string>
+#include <vector>
 
 int main(int argc, char* argv[]) {
     if (argc != 3) {
-        std::cerr << "Usage: KnotesCore <core-tag> <knots-tag>\n";
+        std::cerr << "Usage: " << argv[0] << " <coreTag> <knotsTag>\n";
         return 1;
     }
 
     std::string coreTag  = argv[1];
     std::string knotsTag = argv[2];
 
-    std::string coreRepo  = "src/bitcoin";
-    std::string knotsRepo = "src/bitcoinknots";
+    git::init();
 
-    try {
-        git::init();
-        auto files = git::listChangedFiles(coreRepo, coreTag, knotsRepo, knotsTag);
-        std::cout << "Number of changed files: " << files.size() << "\n";
+    const std::string coreRepoPath  = "./src/bitcoin/";
+    const std::string knotsRepoPath = "./src/bitcoinknots";
 
-        for (const auto& f : files) {
-            std::cout << "  " << f.path << " -> ";
-            switch (f.status) {
-                case git::FileDiff::Status::OnlyInCore:  std::cout << "Only in Core"; break;
-                case git::FileDiff::Status::OnlyInKnots: std::cout << "Only in Knots"; break;
-                case git::FileDiff::Status::Modified:    std::cout << "Modified"; break;
-            }
-            std::cout << "\n";
+    auto diffs = git::listChangedFiles(coreRepoPath, coreTag, knotsRepoPath, knotsTag);
 
-            if (!f.patch.empty()) {
-                diff::printPatch(f.path, f.patch);
-            }
+    std::cout << "Number of changed files: " << diffs.size() << "\n";
+    for (auto& fd : diffs) {
+        std::string statusStr;
+        switch (fd.status) {
+            case git::FileDiff::Status::OnlyInCore:  statusStr = "Only in Core"; break;
+            case git::FileDiff::Status::OnlyInKnots: statusStr = "Only in Knots"; break;
+            case git::FileDiff::Status::Modified:    statusStr = "Modified"; break;
         }
+        std::cout << "  " << fd.path << " -> " << statusStr << "\n";
 
-        git::shutdown();
-    } catch (const std::exception& ex) {
-        std::cerr << "Error: " << ex.what() << "\n";
-        git::shutdown();
-        return 1;
+        // print patch if available
+        if (!fd.patch.empty()) {
+            std::cout << fd.patch << "\n";
+        }
     }
+
+    git::shutdown();
     return 0;
 }
 
