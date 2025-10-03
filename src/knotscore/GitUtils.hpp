@@ -1,40 +1,40 @@
 #pragma once
 
+#include <git2.h>
 #include <string>
 #include <vector>
 
-#include <git2.h>
-
-namespace git {
-
+// Simple structure to represent a file diff
 struct FileDiff {
-    enum class Status { OnlyInCore, OnlyInKnots, Modified };
+    enum class Status {
+        OnlyInCore,
+        OnlyInKnots,
+        Modified
+    };
+
     std::string path;
     Status status;
-    std::string patch;
+    std::string patch; // unified diff text if Modified
 };
 
-// ------------------- initialization -------------------
+namespace gitutils {
+
+// lifecycle
 void init();
 void shutdown();
 
-// ------------------- repository helpers -------------------
-git_repository* openRepo(const std::string& path);
-git_commit* resolveCommit(git_repository* repo, const std::string& tag);
+// open repository
+::git_repository* openRepo(const std::string& path);
+
+// resolve tag/commit to commit object
+::git_commit* resolveCommit(::git_repository* repo, const std::string& tag);
+
+// list changed files between two tags
 std::vector<FileDiff> listChangedFiles(
     const std::string& coreRepoPath,
     const std::string& coreTag,
     const std::string& knotsRepoPath,
     const std::string& knotsTag);
 
-// ------------------- diff helpers -------------------
-// Compare a single file between two trees in two repositories
-std::string diffFile(
-    git_repository* coreRepo,
-    git_tree* coreTree,
-    git_repository* knotsRepo,
-    git_tree* knotsTree,
-    const std::string& path);
-
-} // namespace git
+} // namespace gitutils
 
